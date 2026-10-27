@@ -27,8 +27,19 @@ Run the bridge:
 python scratch_groq_bridge.py
 ```
 
-Enter your Scratch username, password, and project ID when prompted. The
-password and Groq API key are hidden as you type.
+The program first asks for an optional Scratch session ID. If you leave it
+blank, it asks for your Scratch username and password. In hosted environments
+where Scratch rejects password login because of the runtime's IP address, use
+the session ID from your own Scratch browser login instead. The ID is a
+credential: enter it only into the hidden prompt or set `SCRATCH_SESSION_ID`
+in your environment, and never share or commit it. The program also asks for
+the project ID and Groq API key; secrets are hidden as you type.
+
+To obtain the session ID, use your browser's developer tools while logged into
+Scratch and inspect the `scratchsessionsid` cookie for `scratch.mit.edu`. Enter
+the cookie value only, not the cookie name. Do not send this value to anyone.
+You can also run the bridge locally rather than in a hosted environment;
+Scratch may allow username/password login there.
 
 ## Create and use the Scratch project
 

@@ -5,6 +5,7 @@ import time
 
 import scratchattach as scratch
 from groq import Groq
+from scratchattach.utils.exceptions import LoginFailure
 
 
 PROMPT_VARIABLE = "☁ prompt"
@@ -14,6 +15,10 @@ MAX_CLOUD_VALUE_LENGTH = 256
 MAX_TEXT_LENGTH = (MAX_CLOUD_VALUE_LENGTH - 1) // 2
 POLL_INTERVAL_SECONDS = 0.5
 MODEL = "llama-3.3-70b-versatile"
+
+
+class ScratchLoginError(Exception):
+    pass
 
 
 def encode_text(text: str) -> str:
@@ -39,19 +44,36 @@ def decode_text(value: str) -> str:
     return "".join(characters)
 
 
-def read_credentials() -> tuple[str, str, str, str]:
-    username = input("Scratch username: ").strip()
-    password = getpass.getpass("Scratch password: ")
+def read_credentials() -> tuple[str, str, str, str, str]:
+    session_id = os.environ.get("SCRATCH_SESSION_ID") or getpass.getpass(
+        "Scratch session ID (leave blank to use username/password): "
+    ).strip()
+    username = ""
+    password = ""
+    if not session_id:
+        username = input("Scratch username: ").strip()
+        password = getpass.getpass("Scratch password: ")
     project_id = input("Scratch project ID: ").strip()
     api_key = os.environ.get("GROQ_API_KEY") or getpass.getpass("Groq API key: ")
-    if not username or not password or not project_id or not api_key:
-        raise ValueError("Username, password, project ID, and Groq API key are required.")
-    return username, password, project_id, api_key
+    if (not session_id and (not username or not password)) or not project_id or not api_key:
+        raise ValueError("Scratch authentication, project ID, and Groq API key are required.")
+    return username, password, session_id, project_id, api_key
 
 
 def main() -> None:
-    username, password, project_id, api_key = read_credentials()
-    session = scratch.login(username, password)
+    username, password, session_id, project_id, api_key = read_credentials()
+    try:
+        if session_id:
+            session = scratch.login_by_id(session_id, username=username or None)
+        else:
+            session = scratch.login(username, password)
+    except LoginFailure as error:
+        raise ScratchLoginError(
+            "Scratch rejected username/password login. This can happen when the "
+            "runtime's IP is blocked by Scratch. Run the bridge on your own "
+            "computer, or restart and enter your Scratch session ID instead. "
+            "Treat that ID like your password and never share it."
+        ) from error
     cloud = session.connect_cloud(project_id)
     groq = Groq(api_key=api_key)
 
@@ -109,6 +131,6 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except ValueError as error:
+    except (ValueError, ScratchLoginError) as error:
         print(f"Error: {error}", file=sys.stderr)
         sys.exit(1)
